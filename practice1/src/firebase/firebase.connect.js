@@ -2,13 +2,13 @@ import { initializeApp } from "firebase/app";
 
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDnslBhNJ2N7ZPDFjX49vYAwJomlYOazYo",
-  authDomain: "react-firebase-e5fa4.firebaseapp.com",
-  projectId: "react-firebase-e5fa4",
-  storageBucket: "react-firebase-e5fa4.appspot.com",
-  messagingSenderId: "135075403601",
-  appId: "1:135075403601:web:8bc96ff4231d21633ca570",
-  databaseURL:"https://react-firebase-e5fa4-default-rtdb.firebaseio.com"
+  apiKey: import.meta.env.VITE_API_KEY,
+  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_APP_ID,
+  databaseURL: import.meta.env.VITE_DATABASE_URL,
 };
 
 

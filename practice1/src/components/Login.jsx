@@ -1,22 +1,25 @@
 import React,{useState} from 'react'
-import {getAuth,signInWithEmailAndPassword} from "firebase/auth"
-import app from "../firebase/firebase.connect.js"
+import { useFireBase } from '../context/Firebase.connect.jsx';
 
-const auth=getAuth(app);
 
 
 const Login = () => {
 
-  
+  const firebase=useFireBase();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    signInWithEmailAndPassword(auth,email,password)
-    .then((value)=>console.log(value))
+
+    firebase.Login(email, password)
+      .then(() => {
+        console.log('User signed in successfully');
+      })
+      .catch((error) => {
+        console.error('Error signing in:', error);
+      });
   };
 
 

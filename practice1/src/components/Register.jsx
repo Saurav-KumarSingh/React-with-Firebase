@@ -1,34 +1,31 @@
 import React,{useState} from 'react'
-// import { getDatabase,ref,set } from "firebase/database";
-import {getAuth,createUserWithEmailAndPassword} from "firebase/auth"
-import app from "../firebase/firebase.connect.js"
-
-// const database=getDatabase(app);
-
-const auth=getAuth(app);
+import { useFireBase } from '../context/Firebase.connect.jsx';
 
 
 const Signup = () => {
-
-  // const putData=()=>{
-  //   set(ref(database,'user/saurav'),{
-  //     id:1,
-  //     name:'Saurav',
-  //     age:20
-  //   })
-  // }
   
+  const firebase=useFireBase();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    createUserWithEmailAndPassword(auth,email,password)
-    .then((value)=>console.log(value))
+    e.preventDefault(); // Prevents page reload
+    firebase.signupWithEmailandPassword(email, password)
+      .then(() => {
+        console.log('User signed up successfully');
+      })
+      .catch((error) => {
+        console.error('Error signing up:', error);
+      });
+      firebase.sendData(`users`,{email, password})
+      .then(() => {
+        console.log('User signed up successfully');
+      })
+      .catch((error) => {
+        console.error('Error signing up:', error);
+      });
   };
-
 
   return (
     <div>

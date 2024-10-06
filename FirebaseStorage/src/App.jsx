@@ -15,7 +15,6 @@ const App = () => {
   const fileInputRef = useRef(null); // Use ref for file input
 
   // Fetch all users from Firestore on component mount
-
   const fetchUsers = async () => {
     try {
       const userSnapshot = await getDocs(userCollection);
@@ -27,8 +26,6 @@ const App = () => {
   };
 
   useEffect(() => {
-    
-
     fetchUsers();
   }, []);
 
@@ -43,37 +40,37 @@ const App = () => {
     setFile(e.target.files[0]); // Save the selected file to state
   };
 
-  // Handle form submission
+  // Handle form submission (add/update user)
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // File upload to Firebase Storage
-      const fileRef = storageRef(storage, `images/${formData.name}`);
-      await uploadBytes(fileRef, file);
+      let imgURL = selectedUser ? selectedUser.imgURL : ''; // Use existing imgURL if updating
+      
+      if (file) {
+        // File upload to Firebase Storage if a new file is selected
+        const fileRef = storageRef(storage, `images/${formData.name}`);
+        await uploadBytes(fileRef, file);
+        imgURL = await getDownloadURL(fileRef); // Get the file's URL after upload
+      }
 
-      // Get the file's URL after upload
-      const imgURL = await getDownloadURL(fileRef);
-
-      // If updating an existing user
       if (selectedUser) {
+        // Update the existing user's document
         await updateDoc(doc(db, 'user', selectedUser.id), { ...formData, imgURL });
       } else {
-        // Add document to Firestore with formData and imgURL
+        // Add a new user document to Firestore
         await addDoc(userCollection, { ...formData, imgURL });
       }
       
       // Reset form data and file state
       setFormData({ name: '', email: '' });
       setFile(null);
-      setSelectedUser(null); // Reset selected user
+      setSelectedUser(null); // Reset selected user after updating or adding
 
-      // Clear file input field by resetting the ref
       if (fileInputRef.current) {
-        fileInputRef.current.value = null;
+        fileInputRef.current.value = null; // Clear file input field
       }
 
-      // Fetch updated users list after adding/updating a user
-      fetchUsers();
+      fetchUsers(); // Fetch updated user list
     } catch (error) {
       console.error('Error adding/updating document: ', error);
     }
@@ -82,21 +79,19 @@ const App = () => {
   // Delete a user
   const handleDelete = async (userId, imgURL) => {
     try {
-      // Delete from Firestore
-      await deleteDoc(doc(db, 'user', userId));
+      await deleteDoc(doc(db, 'user', userId)); // Delete from Firestore
 
-      // If you want to delete the associated file from storage
-      const fileRef = storageRef(storage, imgURL); // Use the URL path to reference the file
+      // Delete associated file from Firebase Storage
+      const fileRef = storageRef(storage, imgURL);
       await deleteObject(fileRef);
-      
-      // Fetch updated users list after deletion
-      fetchUsers();
+
+      fetchUsers(); // Fetch updated user list after deletion
     } catch (error) {
       console.error('Error deleting document: ', error);
     }
   };
 
-  // Update a user
+  // Edit a user (populate the form)
   const handleEdit = (user) => {
     setFormData({ name: user.name, email: user.email });
     setSelectedUser(user); // Set the selected user for updating
@@ -134,7 +129,7 @@ const App = () => {
             name="file"
             ref={fileInputRef} // Attach the ref to the file input
             onChange={handleFileChange} 
-            required={!selectedUser} // Make file required only when adding a new user
+            required={!selectedUser} // File required only for new user
           />
         </div>
         <br />
@@ -149,7 +144,7 @@ const App = () => {
         {users.map(user => (
           <li key={user.id}>
             <strong>Name:</strong> {user.name}, <strong>Email:</strong> {user.email}<br/>
-             <img src={user.imgURL} alt={user.name} height={100} /><br />
+            <img src={user.imgURL} alt={user.name} height={100} /><br />
             <button onClick={() => handleEdit(user)}>Edit</button>
             <button onClick={() => handleDelete(user.id, user.imgURL)}>Delete</button>
           </li>

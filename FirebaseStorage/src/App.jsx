@@ -1,93 +1,161 @@
-import React, { useState } from 'react';
-import { firebaseApp, storage } from './firebase.connect.js';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
+import React, { useState, useRef, useEffect } from 'react';
+import { firebaseApp } from './firebase.connect.js';
+import { getFirestore, addDoc, getDocs, collection, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const App = () => {
-  const [file, setFile] = useState(null);
-  const storageRef = ref(storage, `${file?.name}`);
+  const db = getFirestore(firebaseApp);
+  const userCollection = collection(db, 'user');
+  const storage = getStorage(firebaseApp);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (file) {
-      console.log('Submitted file:', file.name);
-      
-      // Upload the file and metadata
-      const uploadTask = uploadBytesResumable(storageRef, file);
-      uploadTask.on('state_changed', 
-        (snapshot) => {
-          // Observe state change events such as progress, pause, and resume
-          // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          console.log('Upload is ' + progress + '% done');
-          switch (snapshot.state) {
-            case 'paused':
-              console.log('Upload is paused');
-              break;
-            case 'running':
-              console.log('Upload is running');
-              break;
-          }
-        }, 
-        (error) => {
-          console.log(error.message)
-        }, 
-        () => {
-          // Handle successful uploads on complete
-          
-          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-            console.log('File available at', downloadURL);
-          });
-        }
-      );
-    } else {
-      console.log('No file selected');
+  const [formData, setFormData] = useState({ name: '', email: '' });
+  const [file, setFile] = useState(null); 
+  const [users, setUsers] = useState([]); // State to hold retrieved users
+  const [selectedUser, setSelectedUser] = useState(null); // State for the user to be updated
+  const fileInputRef = useRef(null); // Use ref for file input
+
+  // Fetch all users from Firestore on component mount
+
+  const fetchUsers = async () => {
+    try {
+      const userSnapshot = await getDocs(userCollection);
+      const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUsers(userList);
+    } catch (error) {
+      console.error('Error fetching users: ', error);
     }
   };
 
-  const handleDownload=()=>{
-    getDownloadURL(storageRef)
-    .then((url) => {
-      // Insert url into an <img> tag to "download"
-    })
-    .catch((error) => {
-      // A full list of error codes is available at
-      // https://firebase.google.com/docs/storage/web/handle-errors
-      switch (error.code) {
-        case 'storage/object-not-found':
-          // File doesn't exist
-          break;
-        case 'storage/unauthorized':
-          // User doesn't have permission to access the object
-          break;
-        case 'storage/canceled':
-          // User canceled the upload
-          break;
-  
-        // ...
-  
-        case 'storage/unknown':
-          // Unknown error occurred, inspect the server response
-          break;
+  useEffect(() => {
+    
+
+    fetchUsers();
+  }, []);
+
+  // Handle form input changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Handle file input change
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]); // Save the selected file to state
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      // File upload to Firebase Storage
+      const fileRef = storageRef(storage, `images/${formData.name}`);
+      await uploadBytes(fileRef, file);
+
+      // Get the file's URL after upload
+      const imgURL = await getDownloadURL(fileRef);
+
+      // If updating an existing user
+      if (selectedUser) {
+        await updateDoc(doc(db, 'user', selectedUser.id), { ...formData, imgURL });
+      } else {
+        // Add document to Firestore with formData and imgURL
+        await addDoc(userCollection, { ...formData, imgURL });
       }
-    });
-  }
+      
+      // Reset form data and file state
+      setFormData({ name: '', email: '' });
+      setFile(null);
+      setSelectedUser(null); // Reset selected user
+
+      // Clear file input field by resetting the ref
+      if (fileInputRef.current) {
+        fileInputRef.current.value = null;
+      }
+
+      // Fetch updated users list after adding/updating a user
+      fetchUsers();
+    } catch (error) {
+      console.error('Error adding/updating document: ', error);
+    }
+  };
+
+  // Delete a user
+  const handleDelete = async (userId, imgURL) => {
+    try {
+      // Delete from Firestore
+      await deleteDoc(doc(db, 'user', userId));
+
+      // If you want to delete the associated file from storage
+      const fileRef = storageRef(storage, imgURL); // Use the URL path to reference the file
+      await deleteObject(fileRef);
+      
+      // Fetch updated users list after deletion
+      fetchUsers();
+    } catch (error) {
+      console.error('Error deleting document: ', error);
+    }
+  };
+
+  // Update a user
+  const handleEdit = (user) => {
+    setFormData({ name: user.name, email: user.email });
+    setSelectedUser(user); // Set the selected user for updating
+  };
 
   return (
-  <>
-    <form onSubmit={handleSubmit}>
-      <input
-        type="file"
-        onChange={(e) => setFile(e.target.files[0])}
-      />
-      <br />
-      <button type="submit">
-        Submit
-      </button>
-    </form>
-    <button onClick={handleDownload}>
-      download
-    </button>
-  </>
+    <div>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>Name: </label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <br />
+        <div>
+          <label>Email: </label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <br />
+        <div>
+          <label>File: </label>
+          <input
+            type="file"
+            name="file"
+            ref={fileInputRef} // Attach the ref to the file input
+            onChange={handleFileChange} 
+            required={!selectedUser} // Make file required only when adding a new user
+          />
+        </div>
+        <br />
+        <div>
+          <button type="submit">{selectedUser ? 'Update' : 'Add'}</button>
+        </div>
+      </form>
+
+      {/* Display all users */}
+      <h2>User List</h2>
+      <ul>
+        {users.map(user => (
+          <li key={user.id}>
+            <strong>Name:</strong> {user.name}, <strong>Email:</strong> {user.email}<br/>
+             <img src={user.imgURL} alt={user.name} height={100} /><br />
+            <button onClick={() => handleEdit(user)}>Edit</button>
+            <button onClick={() => handleDelete(user.id, user.imgURL)}>Delete</button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 };
 
